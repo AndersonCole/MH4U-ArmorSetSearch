@@ -61,6 +61,11 @@ namespace MH4GASS
 		return ReverseCompare( s1->total_slots_spare, s2->total_slots_spare );
 	}
 
+	int CompareSolutionByDecosUsed(Solution^ s1, Solution^ s2)
+	{
+		return Compare(s1->decorations.Count, s2->decorations.Count);
+	}
+
 	int CompareSolutionByFamily( Solution^ s1, Solution^ s2 )
 	{
 		return TryReverseCompare( s1->family_score[0], s2->family_score[0] ) :
@@ -156,6 +161,7 @@ namespace MH4GASS
 	private: System::Windows::Forms::ToolStripMenuItem^  mnuAllowBadSkills;
 	private: System::Windows::Forms::ToolStripMenuItem^  mnuAllowArena;
 	private: System::Windows::Forms::ToolStripMenuItem^  mnuAllowEventArmor;
+	private: System::Windows::Forms::ToolStripMenuItem^  mnuDarkMode;
 	private: System::Windows::Forms::Button^  btnCharms;
 	private: System::Windows::Forms::GroupBox^  grpCharms;
 	private: System::Windows::Forms::ComboBox^  cmbCharmSelect;
@@ -174,6 +180,7 @@ namespace MH4GASS
 	private: System::Windows::Forms::Button^  btnEquipment;
 	private: System::Windows::Forms::ToolStripMenuItem^  mnuAllowJapaneseOnlyDLC;
 	private: System::Windows::Forms::ToolStripSeparator^  toolStripSeparator2;
+	private: System::Windows::Forms::ToolStripSeparator^  toolStripSeparator3;
 	private: System::Windows::Forms::ToolStripMenuItem^  mnuSpendSpareSlots;
 	private: System::Windows::Forms::ToolStripMenuItem^  mnuAllowExcavatedArmor;
 	private: System::Windows::Forms::ComboBox^  cmbFilterByExtraSkill;
@@ -294,14 +301,180 @@ private: System::Windows::Forms::ToolStripMenuItem^  mnuAllowGunnerHelms;
 			}
 		}
 
-		ComboBox^ GetNewComboBox( const unsigned width, const unsigned i )
+		void ComboBox_DrawItem(Object^ sender, DrawItemEventArgs^ e) 
 		{
-			ComboBox^ box = gcnew ComboBox;
+			e->DrawBackground();
+			e->DrawFocusRectangle();
+
+			if (e->Index < 0)
+				return;
+		}
+
+		ref class MyComboBox : public ComboBox
+		{
+			bool draw_focus;
+		private:
+			Form^ parentForm;
+		public:
+			MyComboBox(Form^ form) : draw_focus( false ) 
+			{
+				parentForm = form;
+			}
+
+			void SetOwnerDraw()
+			{
+				DrawMode = Windows::Forms::DrawMode::OwnerDrawFixed;
+				try
+				{
+					VisualStyles::VisualStyleRenderer renderer( "COMBOBOX", 1, (int)VisualStyles::ComboBoxState::Normal );
+				}
+				catch( Exception^ e )
+				{
+					Assert( false, e->ToString() );
+					return; //failed to create style renderer. don't set user paint
+				}
+
+				SetStyle( ControlStyles::UserPaint | ControlStyles::DoubleBuffer, true );
+			}
+
+			virtual void OnLostFocus( System::EventArgs^ e ) override
+			{
+				draw_focus = false;
+				Refresh();
+			}
+
+			virtual void OnGotFocus( System::EventArgs^ e ) override
+			{
+				draw_focus = true;
+				Refresh();
+			}
+
+			virtual void OnDrawItem( DrawItemEventArgs^ e ) override
+			{
+				e->DrawBackground();
+				e->DrawFocusRectangle();
+
+				if( e->Index < 0 )
+					return;
+
+				String^ text = Items[ e->Index ]->ToString();
+				Skill^ skill = Skill::FindSkill( text );
+
+				Form1^ form = dynamic_cast<Form1^>(parentForm);
+				if (form && form->mnuDarkMode->Checked) 
+				{
+					e->Graphics->FillRectangle(gcnew SolidBrush(Color::FromArgb(38, 40, 40)), e->Bounds);
+					TextRenderer::DrawText(e->Graphics, text, e->Font, e->Bounds, Color::FromArgb(235, 235, 235), TextFormatFlags::Left);
+				}
+				else 
+				{
+					TextRenderer::DrawText(e->Graphics, text, e->Font, e->Bounds, Color::Black, TextFormatFlags::Left);
+				}
+			}
+
+			virtual void OnDropDown( System::EventArgs^ e ) override
+			{
+				draw_focus = false;
+				Invalidate();
+			}
+
+			virtual void OnDropDownClosed( System::EventArgs^ e ) override
+			{
+				if( SelectedIndex == 0 && DrawMode == Windows::Forms::DrawMode::OwnerDrawFixed )
+				{
+					SuspendDrawing( this );
+					SelectedIndex = -1;
+					ResumeDrawing( this );
+				}
+				draw_focus = false;
+			}
+
+			virtual void OnMouseEnter(EventArgs^ e) override
+			{
+				draw_focus = true;
+				Invalidate();
+			}
+
+			virtual void OnMouseLeave(EventArgs^ e) override
+			{
+				draw_focus = false;
+				Invalidate();
+			}
+
+			virtual void OnPaint( PaintEventArgs^ e ) override
+			{
+				Form1^ form = dynamic_cast<Form1^>(parentForm);
+				if (form && form->mnuDarkMode->Checked)
+				{
+					//since button renderer cant have different background colours, im drawing rectangles to act as stand ins
+					Color color = Color::FromArgb(38, 40, 40);
+					if (draw_focus) {
+						color = Color::FromArgb(30, 30, 30);
+					}
+
+					e->Graphics->FillRectangle(gcnew SolidBrush(color), Rectangle(-1, -1, Size.Width + 2, Size.Height + 2));
+					e->Graphics->DrawRectangle(gcnew Pen(Color::FromArgb(75, 75, 75), 5), Rectangle(-1, -1, Size.Width + 2, Size.Height + 2));
+
+					int arrowWidth = 5;
+					int arrowHeight = 4;
+
+					int centerY = Size.Height / 2;
+
+					array<Point>^ points = 
+					{
+						Point(Size.Width - 14, centerY - (arrowHeight / 2) ),
+						Point(Size.Width - 6, centerY - (arrowHeight / 2) ),
+						Point(Size.Width - 10, centerY + (arrowHeight / 2) )
+					};
+
+					e->Graphics->FillPolygon(gcnew SolidBrush(Color::FromArgb(75, 75, 75)), points);
+				}
+				else 
+				{
+					ButtonRenderer::DrawButton(e->Graphics, Rectangle(-1, -1, Size.Width + 2, Size.Height + 2), DroppedDown ? VisualStyles::PushButtonState::Pressed : VisualStyles::PushButtonState::Normal);
+					
+					VisualStyles::VisualStyleRenderer renderer("COMBOBOX", 1, (int)(DroppedDown ? VisualStyles::ComboBoxState::Pressed : VisualStyles::ComboBoxState::Normal));
+					renderer.DrawBackground(e->Graphics, Rectangle(Size.Width - 20, 0, 20, Size.Height), Rectangle(Size.Width - 15, 5, 10, Size.Height - 10));
+					
+					if (Focused && !DroppedDown && draw_focus)
+						ControlPaint::DrawFocusRectangle(e->Graphics, Rectangle(3, 3, Width - 23, Height - 6));
+				}
+
+				if( SelectedIndex < 0 )
+					return;
+
+				Skill^ skill = Skill::FindSkill( Text );
+
+				if (form && form->mnuDarkMode->Checked)
+				{
+					TextRenderer::DrawText(e->Graphics, Text, Font, Point(2, 4), Color::FromArgb(235, 235, 235) );
+				}
+				else
+				{
+					TextRenderer::DrawText( e->Graphics, Text, Font, Point(2, 4), Color::Black );
+				}
+			}
+		};
+
+		ComboBox^ GetNewComboBox( const unsigned width, const unsigned i, const bool is_filter )
+		{
+			MyComboBox^ box = gcnew MyComboBox(this);
 			box->Location = System::Drawing::Point( 6, 19 + i * 27 );
-			box->Size = System::Drawing::Size( width, 21 );
+			box->Size = System::Drawing::Size( width, box->Size.Height );
 			box->DropDownStyle = System::Windows::Forms::ComboBoxStyle::DropDownList;
 			box->AutoCompleteSource = AutoCompleteSource::ListItems;
 			box->AutoCompleteMode = AutoCompleteMode::Suggest;
+			
+			if( is_filter )
+			{
+				box->SelectedIndexChanged += gcnew System::EventHandler(this, &Form1::cmbSkillFilter_SelectedIndexChanged);
+			}
+			else
+			{
+				box->SelectionChangeCommitted += gcnew System::EventHandler(this, &Form1::cmbSkill_SelectedIndexChanged);
+				box->SetOwnerDraw();
+			}
+			
 			return box;
 		}
 
@@ -309,15 +482,15 @@ private: System::Windows::Forms::ToolStripMenuItem^  mnuAllowGunnerHelms;
 		{
 			for( unsigned i = 0; i < NumSkills; ++i )
 			{
-				gSkillFilters.Add( GetNewComboBox( 134, i ) );
-				bSkillFilters.Add( GetNewComboBox( 134, i ) );
+				gSkillFilters.Add( GetNewComboBox( 134, i, true ) );
+				bSkillFilters.Add( GetNewComboBox( 134, i, true ) );
 				gSkillFilters[ i ]->SelectedIndexChanged += gcnew System::EventHandler(this, &Form1::cmbSkillFilter_SelectedIndexChanged);
 				bSkillFilters[ i ]->SelectedIndexChanged += gcnew System::EventHandler(this, &Form1::cmbSkillFilter_SelectedIndexChanged);
 				grpGSkillFilters->Controls->Add( gSkillFilters[ i ] );
 				grpBSkillFilters->Controls->Add( bSkillFilters[ i ] );
 
-				gSkills.Add( GetNewComboBox( 171, i ) );
-				bSkills.Add( GetNewComboBox( 171, i ) );
+				gSkills.Add( GetNewComboBox( 171, i, false ) );
+				bSkills.Add( GetNewComboBox( 171, i, false ) );
 				gSkills[ i ]->SelectedIndexChanged += gcnew System::EventHandler(this, &Form1::cmbSkill_SelectedIndexChanged);
 				bSkills[ i ]->SelectedIndexChanged += gcnew System::EventHandler(this, &Form1::cmbSkill_SelectedIndexChanged);
 				grpGSkills->Controls->Add( gSkills[ i ] );
@@ -577,6 +750,16 @@ private: System::Windows::Forms::ToolStripMenuItem^  mnuAllowGunnerHelms;
 					const int hunter_type = Convert::ToInt32( fin.ReadLine() );
 					rdoMale->Checked = Convert::ToBoolean( fin.ReadLine() );
 					rdoFemale->Checked = !rdoMale->Checked;
+					mnuDarkMode->Checked = Convert::ToBoolean(fin.ReadLine());
+ 					if (mnuDarkMode->Checked) {
+ 						this->BackColor = System::Drawing::Color::FromArgb(38, 40, 40);
+ 						this->ForeColor = System::Drawing::Color::FromArgb(235, 235, 235);
+ 
+ 						for each (Control^ control in this->Controls)
+ 						{
+ 							ApplyDarkMode(control);
+ 						}
+ 					}
 					mnuAllowBadSkills->Checked = Convert::ToBoolean( fin.ReadLine() );
 					mnuAllowArena->Checked = Convert::ToBoolean( fin.ReadLine() );
 					mnuAllowEventArmor->Checked = Convert::ToBoolean( fin.ReadLine() );
@@ -680,6 +863,7 @@ private: System::Windows::Forms::ToolStripMenuItem^  mnuAllowGunnerHelms;
 			fout.WriteLine( last_search_gunner );
 			fout.WriteLine( tabHunterType->SelectedIndex );
 			fout.WriteLine( rdoMale->Checked );
+			fout.WriteLine( mnuDarkMode->Checked );
 			fout.WriteLine( mnuAllowBadSkills->Checked );
 			fout.WriteLine( mnuAllowArena->Checked );
 			fout.WriteLine( mnuAllowEventArmor->Checked );
@@ -846,6 +1030,7 @@ private: System::Windows::Forms::ToolStripMenuItem^  mnuAllowGunnerHelms;
 			this->mnuOptions = (gcnew System::Windows::Forms::ToolStripMenuItem());
 			this->mnuClearSettings = (gcnew System::Windows::Forms::ToolStripMenuItem());
 			this->toolStripSeparator1 = (gcnew System::Windows::Forms::ToolStripSeparator());
+			this->mnuDarkMode = (gcnew System::Windows::Forms::ToolStripMenuItem());
 			this->mnuAllowBadSkills = (gcnew System::Windows::Forms::ToolStripMenuItem());
 			this->mnuAllowArena = (gcnew System::Windows::Forms::ToolStripMenuItem());
 			this->mnuAllowEventArmor = (gcnew System::Windows::Forms::ToolStripMenuItem());
@@ -855,6 +1040,7 @@ private: System::Windows::Forms::ToolStripMenuItem^  mnuAllowGunnerHelms;
 			this->mnuAllowLowerTierArmor = (gcnew System::Windows::Forms::ToolStripMenuItem());
 			this->mnuAllowGunnerHelms = (gcnew System::Windows::Forms::ToolStripMenuItem());
 			this->toolStripSeparator2 = (gcnew System::Windows::Forms::ToolStripSeparator());
+			this->toolStripSeparator3 = (gcnew System::Windows::Forms::ToolStripSeparator());
 			this->mnuMaxResults = (gcnew System::Windows::Forms::ToolStripMenuItem());
 			this->mnuNumResults = (gcnew System::Windows::Forms::ToolStripTextBox());
 			this->mnuPrintDecoNames = (gcnew System::Windows::Forms::ToolStripMenuItem());
@@ -1110,8 +1296,8 @@ private: System::Windows::Forms::ToolStripMenuItem^  mnuAllowGunnerHelms;
 			// 
 			// mnuOptions
 			// 
-			this->mnuOptions->DropDownItems->AddRange(gcnew cli::array< System::Windows::Forms::ToolStripItem^  >(16) {this->mnuClearSettings, 
-				this->toolStripSeparator1, this->mnuAllowBadSkills, this->mnuAllowArena, this->mnuAllowEventArmor, this->mnuAllowExcavatedArmor, 
+			this->mnuOptions->DropDownItems->AddRange(gcnew cli::array< System::Windows::Forms::ToolStripItem^  >(18) {this->mnuClearSettings, 
+				this->toolStripSeparator1, this->mnuDarkMode, this->toolStripSeparator3, this->mnuAllowBadSkills, this->mnuAllowArena, this->mnuAllowEventArmor, this->mnuAllowExcavatedArmor, 
 				this->mnuAllowExcavatedWeapons, this->mnuAllowJapaneseOnlyDLC, this->mnuAllowLowerTierArmor, this->mnuAllowGunnerHelms, this->toolStripSeparator2, 
 				this->mnuMaxResults, this->mnuPrintDecoNames, this->mnuSortSkillsAlphabetically, this->mnuShowRequiredSkillPoints, this->mnuSpendSpareSlots});
 			this->mnuOptions->Name = L"mnuOptions";
@@ -1129,6 +1315,19 @@ private: System::Windows::Forms::ToolStripMenuItem^  mnuAllowGunnerHelms;
 			// 
 			this->toolStripSeparator1->Name = L"toolStripSeparator1";
 			this->toolStripSeparator1->Size = System::Drawing::Size(235, 6);
+			// 
+ 			// mnuDarkMode
+ 			// 
+ 			this->mnuDarkMode->CheckOnClick = true;
+ 			this->mnuDarkMode->Name = L"mnuDarkMode";
+ 			this->mnuDarkMode->Size = System::Drawing::Size(238, 22);
+ 			this->mnuDarkMode->Text = L"Dark Mode";
+ 			this->mnuDarkMode->Click += gcnew System::EventHandler(this, &Form1::OptionsChanged);
+ 			// 
+ 			// toolStripSeparator3
+ 			// 
+ 			this->toolStripSeparator3->Name = L"toolStripSeparator3";
+ 			this->toolStripSeparator3->Size = System::Drawing::Size(235, 6);
 			// 
 			// mnuAllowBadSkills
 			// 
@@ -1434,8 +1633,8 @@ private: System::Windows::Forms::ToolStripMenuItem^  mnuAllowGunnerHelms;
 				| System::Windows::Forms::AnchorStyles::Right));
 			this->cmbSort->DropDownStyle = System::Windows::Forms::ComboBoxStyle::DropDownList;
 			this->cmbSort->FormattingEnabled = true;
-			this->cmbSort->Items->AddRange(gcnew cli::array< System::Object^  >(13) {L"None", L"Dragon res", L"Fire res", L"Ice res", 
-				L"Thunder res", L"Water res", L"Base defence", L"Max defence", L"Difficulty", L"Rarity", L"Slots spare", L"Family", L"Extra Skills"});
+			this->cmbSort->Items->AddRange(gcnew cli::array< System::Object^  >(14) {L"None", L"Dragon res", L"Fire res", L"Ice res", 
+				L"Thunder res", L"Water res", L"Base defence", L"Max defence", L"Difficulty", L"Rarity", L"Slots spare", L"Family", L"Extra Skills", L"Decos used"});
 			this->cmbSort->Location = System::Drawing::Point(6, 16);
 			this->cmbSort->Name = L"cmbSort";
 			this->cmbSort->Size = System::Drawing::Size(181, 21);
@@ -1641,6 +1840,103 @@ private:
 			for each( ComboBox^ cb in gSkillFilters )
 				cmbSkillFilter_SelectedIndexChanged( cb, nullptr );
 		}
+
+		else if (sender == mnuDarkMode) 
+ 		{
+ 			if (mnuDarkMode->Checked) 
+ 			{
+ 				this->BackColor = System::Drawing::Color::FromArgb(38, 40, 40);
+ 				this->ForeColor = System::Drawing::Color::FromArgb(235, 235, 235);
+ 
+ 				for each (Control^ control in this->Controls)
+ 				{
+ 					ApplyDarkMode(control);
+ 				}
+ 			}
+ 			else 
+ 			{
+ 				this->BackColor = System::Drawing::Color::FromArgb(255, 255, 255);
+ 				this->ForeColor = System::Drawing::Color::FromArgb(0, 0, 0);
+ 
+ 				for each (Control^ control in this->Controls)
+ 				{
+ 					ApplyLightMode(control);
+ 				}
+ 			}
+ 		}
+ 	}
+ 
+ 	System::Void ApplyDarkMode(Control^ control) 
+ 	{
+ 		control->BackColor = System::Drawing::Color::FromArgb(38, 40, 40);
+ 		control->ForeColor = System::Drawing::Color::FromArgb(235, 235, 235);
+ 		
+ 		if (control->GetType() == Button::typeid)
+ 		{
+ 			Button^ btn = safe_cast<Button^>(control);
+ 			btn->FlatStyle = FlatStyle::Flat;
+ 			btn->FlatAppearance->BorderColor = System::Drawing::Color::FromArgb(75, 75, 75);
+ 			btn->FlatAppearance->BorderSize = 2;
+ 			btn->FlatAppearance->MouseOverBackColor = Color::FromArgb(30, 30, 30);
+ 			btn->FlatAppearance->MouseDownBackColor = Color::FromArgb(20, 20, 20);
+ 		}
+ 
+ 		if (control->GetType() == ComboBox::typeid)
+ 		{
+ 			ComboBox^ cmb = safe_cast<ComboBox^>(control);
+ 			cmb->FlatStyle = FlatStyle::Flat;
+ 			cmb->BackColor = System::Drawing::Color::FromArgb(38, 40, 40);
+ 			cmb->ForeColor = System::Drawing::Color::FromArgb(235, 235, 235);
+ 		}
+ 
+ 		if (control->GetType() == MyComboBox::typeid)
+ 		{
+ 			MyComboBox^ cmb = safe_cast<MyComboBox^>(control);
+ 			cmb->FlatStyle = FlatStyle::Flat;
+ 			cmb->BackColor = System::Drawing::Color::FromArgb(38, 40, 40);
+ 			cmb->ForeColor = System::Drawing::Color::FromArgb(235, 235, 235);
+ 		}
+		
+		if (control->GetType() == RichTextBox::typeid) 
+ 		{
+ 			RichTextBox^ rtxt = safe_cast<RichTextBox^>(control);
+ 			rtxt->BackColor = System::Drawing::Color::FromArgb(32, 34, 35);
+ 			rtxt->ForeColor = System::Drawing::Color::FromArgb(100, 215, 238);
+ 		}
+
+ 		for each (Control^ child in control->Controls)
+ 		{
+ 			ApplyDarkMode(child);
+ 		}
+ 	}
+ 
+ 	System::Void ApplyLightMode(Control^ control)
+ 	{
+ 		control->ResetBackColor();
+ 		control->ResetForeColor();
+ 
+ 		if (control->GetType() == Button::typeid)
+ 		{
+ 			Button^ btn = safe_cast<Button^>(control);
+ 			btn->FlatStyle = FlatStyle::Standard;
+ 		}
+ 
+ 		if (control->GetType() == ComboBox::typeid)
+ 		{
+ 			ComboBox^ cmb = safe_cast<ComboBox^>(control);
+ 			cmb->FlatStyle = FlatStyle::Standard;
+ 		}
+ 
+ 		if (control->GetType() == MyComboBox::typeid)
+ 		{
+ 			MyComboBox^ cmb = safe_cast<MyComboBox^>(control);
+ 			cmb->FlatStyle = FlatStyle::Standard;
+ 		}
+ 
+ 		for each (Control^ child in control->Controls)
+ 		{
+ 			ApplyLightMode(child);
+ 		}
 	}
 
 	/*void QueueTask( Query^ query, Charm^ ct, Armor^ helm )
@@ -2745,6 +3041,7 @@ private:
 		cmbSort->Items[ 10 ] = StaticString( SortSlotsSpare );
 		cmbSort->Items[ 11 ] = StaticString( SortFamily );
 		cmbSort->Items[ 12 ] = StaticString( SortExtraSkills );
+		cmbSort->Items[ 13 ] = StaticString( SortDecosUsed );
 
 		charm_solution_map.Clear();
 		for each( Solution^ s in all_solutions )
@@ -2823,6 +3120,8 @@ private:
 			final_solutions.Sort( gcnew Comparison< Solution^ >( CompareSolutionByFamily ) );
 		else if( cmbSort->SelectedIndex == 12 )
 			final_solutions.Sort( gcnew Comparison< Solution^ >( CompareSolutionsByExtraSkills ) );
+		else if( cmbSort->SelectedIndex == 13)
+			final_solutions.Sort( gcnew Comparison< Solution^ >( CompareSolutionByDecosUsed ) );
 	}
 
 	bool EndsWithSlots( String^% s )

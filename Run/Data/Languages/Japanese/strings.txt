@@ -8,6 +8,7 @@
 &Update
 E&xit
 &Clear Settings
+Dark Mode
 Allow Ba&d Skills
 Allow A&rena Armor
 Allow &Event Armor
@@ -62,6 +63,7 @@ Max Defence
 Difficulty
 Rarity
 Slots Spare
+Decos Used
 Family
 Extra Skills
 Charms

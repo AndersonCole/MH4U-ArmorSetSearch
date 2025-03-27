@@ -296,3 +296,5 @@ Run/Data/mygear*
 /Run/Data/old.txt
 /Run/Data/Images
 *.exe
+
+Data/*

@@ -14,7 +14,7 @@
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav</Extensions>
     </Filter>
     <Filter Include="Crypto">
-      <UniqueIdentifier>{8d2d87cd-649a-449f-bcfa-a664493b33e0}</UniqueIdentifier>
+      <UniqueIdentifier>{e92381d0-739a-41fc-a505-257e4f0c149c}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -166,34 +166,14 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <Image Include="Run\icon.ico">
+    <None Include="Run\icon.ico">
       <Filter>Resource Files</Filter>
-    </Image>
+    </None>
+    <None Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
-    <Text Include="ReadMe.txt" />
-  </ItemGroup>
-  <ItemGroup>
-    <EmbeddedResource Include="About.resx">
+    <ResourceCompile Include="MH4G ASS.rc">
       <Filter>Resource Files</Filter>
-    </EmbeddedResource>
-    <EmbeddedResource Include="Form1.resX">
-      <Filter>Resource Files</Filter>
-    </EmbeddedResource>
-    <EmbeddedResource Include="ManageCharms.resx">
-      <Filter>Resource Files</Filter>
-    </EmbeddedResource>
-    <EmbeddedResource Include="ManageEquipment.resx">
-      <Filter>Resource Files</Filter>
-    </EmbeddedResource>
-    <EmbeddedResource Include="PreviewImage.resx">
-      <Filter>Resource Files</Filter>
-    </EmbeddedResource>
-    <EmbeddedResource Include="SelectJapaneseSkill.resx">
-      <Filter>Resource Files</Filter>
-    </EmbeddedResource>
-    <EmbeddedResource Include="SkillHelp.resx">
-      <Filter>Resource Files</Filter>
-    </EmbeddedResource>
+    </ResourceCompile>
   </ItemGroup>
 </Project>
